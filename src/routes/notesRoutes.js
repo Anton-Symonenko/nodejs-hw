@@ -1,17 +1,18 @@
 import { Router } from 'express';
-import { getAllNotes } from '../controllers/notesController.js';
-
+import {
+  getAllNotes,
+  getNoteById,
+  createNote,
+  deleteNote,
+  updateNote,
+} from '../controllers/notesController.js';
 
 const notesRoutes = Router();
 
 notesRoutes.get('/notes', getAllNotes);
-
-notesRoutes.get('/notes/:noteId', (req, res) => {
-  const { noteId } = req.params;
-
-  res.status(200).json({
-	message: `Retrieved note with ID: ${noteId}`
-});
-});
+notesRoutes.get('/notes/:noteId', getNoteById);
+notesRoutes.post('/notes', createNote);
+notesRoutes.delete('/notes/:noteId', deleteNote);
+notesRoutes.patch('/notes/:noteId', updateNote);
 
 export default notesRoutes;
