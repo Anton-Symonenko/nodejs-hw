@@ -45,3 +45,4 @@ export const updateNote = async (req, res) => {
   }
   res.status(200).json(note);
 };
+
