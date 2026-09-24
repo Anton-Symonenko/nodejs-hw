@@ -8,6 +8,7 @@ import { logger } from './middleware/logger.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import notesRoutes from './routes/notesRoutes.js';
+import router from './routes/authRoutes.js';
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(logger);
 
 const PORT = process.env.PORT || 3000;
 
+app.use(router);
 app.use(notesRoutes);
 
 app.use(notFoundHandler);
