@@ -1,0 +1,101 @@
+/* Schema cards and property details in Swagger UI. */
+.swagger-ui section.models {
+  border-color: #bfdbfe;
+  background: #f8fafc;
+}
+
+.swagger-ui section.models h4 {
+  color: #1e3a8a;
+  background: #eff6ff;
+  border-bottom-color: #bfdbfe;
+}
+
+.swagger-ui section.models .model-container {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-left: 4px solid #0f766e;
+}
+
+.swagger-ui section.models .model-container:hover {
+  background: #ccfbf1;
+}
+
+.swagger-ui .model-box {
+  background: #f0fdfa;
+}
+
+.swagger-ui .model-title {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.swagger-ui .model .property-row > td:first-child,
+.swagger-ui .model .prop-name {
+  color: #115e59;
+}
+
+.swagger-ui .model .prop-type {
+  color: #7e22ce;
+  font-weight: 600;
+}
+
+.swagger-ui .model .prop-format {
+  color: #475569;
+}
+
+.swagger-ui .model .markdown pre {
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.swagger-ui .model .property-row.required .star {
+  color: #b91c1c;
+}
+
+.swagger-ui .model-box-control:focus-visible,
+.swagger-ui .models-control:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 3px;
+}
+
+/* Keep schema text readable when Swagger's dark mode is active. */
+html.dark-mode .swagger-ui section.models,
+html.dark-mode .swagger-ui section.models h4 {
+  background: #172554;
+  border-color: #3b82f6;
+  color: #bfdbfe;
+}
+
+html.dark-mode .swagger-ui section.models .model-container,
+html.dark-mode .swagger-ui .model-box {
+  background: #12302d;
+  border-color: #2dd4bf;
+}
+
+html.dark-mode .swagger-ui section.models .model-container:hover {
+  background: #134e4a;
+}
+
+html.dark-mode .swagger-ui .model-box .model-title {
+  color: #93c5fd;
+}
+
+html.dark-mode .swagger-ui .model .property-row > td:first-child,
+html.dark-mode .swagger-ui .model .prop-name {
+  color: #99f6e4;
+}
+
+html.dark-mode .swagger-ui .model .prop-type {
+  color: #d8b4fe;
+}
+
+html.dark-mode .swagger-ui .model .prop-format {
+  color: #cbd5e1;
+}
+
+html.dark-mode .swagger-ui .model .property-row.required .star {
+  color: #fca5a5;
+}

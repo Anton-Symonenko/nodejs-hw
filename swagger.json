@@ -1,0 +1,1667 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "nodejs-hw",
+    "version": "1.0.0",
+    "description": "Express notes API with cookie-based sessions, user avatars and email password resets. Generated request schemas come directly from the Celebrate/Joi schemas. Unknown routes return 404 {message: \"Route not found\"} after preceding middleware; unauthenticated requests reaching the unscoped notes router instead return 401."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local server (default PORT=3000). Change this URL if PORT is overridden."
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Registration, sessions and password resets."
+    },
+    {
+      "name": "Notes",
+      "description": "Notes belonging to the authenticated user."
+    },
+    {
+      "name": "Users",
+      "description": "User avatar uploads."
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "registerUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Register a user",
+        "description": "Creates a user, hashes the password, creates a session and sets three session cookies.",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Register a user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Three separate Set-Cookie headers set sessionId (1 day), accessToken (15 minutes), and refreshToken (1 day). All use HttpOnly; Secure; SameSite=None; Path=/.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email in use. Or Celebrate request validation failed / JSON parsing failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "loginUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log in",
+        "description": "Checks email and password, deletes one existing session for the user, creates a session and sets three session cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Log in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Three separate Set-Cookie headers set sessionId (1 day), accessToken (15 minutes), and refreshToken (1 day). All use HttpOnly; Secure; SameSite=None; Path=/.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginUserBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "refreshUserSession",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Refresh the session",
+        "description": "Deletes the old session and creates a new one with new cookies. An expired refresh session is deleted and its cookies cleared. No Celebrate validation.",
+        "security": [
+          {
+            "sessionId": [],
+            "refreshToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Refresh the session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Session refreshed"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Three separate Set-Cookie headers set sessionId (1 day), accessToken (15 minutes), and refreshToken (1 day). All use HttpOnly; Secure; SameSite=None; Path=/.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON or invalid JSON body rejected by the global express.json parser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Session token expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logoutUser",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Log out",
+        "description": "Deletes a session if sessionId is supplied and clears all three cookies. No authentication or Celebrate validation; missing cookies still yield 204.",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "Log out",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Separate headers expire sessionId, accessToken and refreshToken.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed JSON or invalid JSON body rejected by the global express.json parser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Session ID to delete, if supplied. Malformed IDs can produce a database cast error (500)."
+          }
+        ]
+      }
+    },
+    "/auth/request-reset-email": {
+      "post": {
+        "operationId": "requestResetEmail",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Request a password reset email",
+        "description": "Returns the same message whether the email exists or not. Existing users receive a link with a JWT valid for 15 minutes.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Request a password reset email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Password reset email sent successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to send the email, please try again later. Template, signing and other unexpected errors also return 500.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestResetEmailBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "resetPassword",
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset the password",
+        "description": "Verifies the reset JWT, updates the password and deletes all sessions for the user.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Reset the password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                },
+                "example": {
+                  "message": "Password reset successfully"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes": {
+      "get": {
+        "operationId": "getAllNotes",
+        "tags": [
+          "Notes"
+        ],
+        "summary": "List your notes",
+        "description": "Requires sessionId and accessToken cookies. Session must exist, access token must be unexpired, and the user must exist. Notes are scoped to that user. Supports pagination, tag filtering and case-insensitive regular expression search in title or content. Unknown query keys are rejected.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List your notes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/GetAllNotesQuery/properties/page"
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/GetAllNotesQuery/properties/perPage"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/GetAllNotesQuery/properties/tag"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/GetAllNotesQuery/properties/search"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createNote",
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Create a note",
+        "description": "Requires sessionId and accessToken cookies. Session must exist, access token must be unexpired, and the user must exist. Notes are scoped to that user. Mongoose defaults missing content to an empty string and tag to Todo.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Create a note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNoteBody"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notes/{noteId}": {
+      "get": {
+        "operationId": "getNoteById",
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Get a note",
+        "description": "Requires sessionId and accessToken cookies. Session must exist, access token must be unexpired, and the user must exist. Notes are scoped to that user.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Note not found (including notes belonging to another user).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "noteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NoteIdParams/properties/noteId"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "updateNote",
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Update a note",
+        "description": "Requires sessionId and accessToken cookies. Session must exist, access token must be unexpired, and the user must exist. Notes are scoped to that user. Requires at least one body property; returns the updated document.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update a note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Note not found (including notes belonging to another user).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "noteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UpdateNoteParams/properties/noteId"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "JSON body validated by Celebrate/Joi; unknown keys are rejected.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNoteBody"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteNote",
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Delete a note",
+        "description": "Requires sessionId and accessToken cookies. Session must exist, access token must be unexpired, and the user must exist. Notes are scoped to that user. Returns the deleted document.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete a note",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Celebrate request validation failed, or the global JSON parser rejected the body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ValidationError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Message"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Note not found (including notes belonging to another user).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected errors, including database/cast failures, return the error message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "noteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/NoteIdParams/properties/noteId"
+            }
+          }
+        ]
+      }
+    },
+    "/users/me/avatar": {
+      "patch": {
+        "operationId": "updateUserAvatar",
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update your avatar",
+        "description": "Requires sessionId and accessToken cookies. Uploads the image to Cloudinary, resizes it to 500 × 500, stores the URL and returns it. Authentication runs in the preceding unscoped notes router and again on this route. No Celebrate validation.",
+        "security": [
+          {
+            "sessionId": [],
+            "accessToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Update your avatar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvatarResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file. Malformed JSON also returns 400.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing session credentials; Session not found; Access token expired; User not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds the global express.json default limit (100 KiB).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON request charset or content encoding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Multer errors (Only images allowed, File too large, Unexpected field), Cloudinary failures and other unexpected errors return {message} with status 500.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/AvatarUpload"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionId": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sessionId",
+        "description": "HttpOnly session identifier set by register, login and refresh."
+      },
+      "accessToken": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "accessToken",
+        "description": "HttpOnly opaque UUID access token, valid for 15 minutes. Required together with sessionId."
+      },
+      "refreshToken": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "refreshToken",
+        "description": "HttpOnly opaque UUID refresh token, valid for one day. Required together with sessionId for refresh."
+      }
+    },
+    "schemas": {
+      "LoginUserBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "description": "Field definitions:\n\n```javascript\n{\n  email: {\n    type: String,\n    required: true,\n    format: \"email\",\n    minLength: 1,\n  },\n  password: {\n    type: String,\n    required: true,\n    minLength: 1,\n  },\n}\n```"
+      },
+      "RegisterUserBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
+        "description": "Field definitions:\n\n```javascript\n{\n  email: {\n    type: String,\n    required: true,\n    format: \"email\",\n    minLength: 1,\n  },\n  password: {\n    type: String,\n    required: true,\n    minLength: 8,\n  },\n}\n```"
+      },
+      "RequestResetEmailBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "minLength": 1,
+            "format": "email"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "description": "Field definitions:\n\n```javascript\n{\n  email: {\n    type: String,\n    required: true,\n    format: \"email\",\n    minLength: 1,\n  },\n}\n```"
+      },
+      "ResetPasswordBody": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "token": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "password",
+          "token"
+        ],
+        "description": "Field definitions:\n\n```javascript\n{\n  password: {\n    type: String,\n    required: true,\n    minLength: 8,\n  },\n  token: {\n    type: String,\n    required: true,\n    minLength: 1,\n  },\n}\n```"
+      },
+      "CreateNoteBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "Work",
+              "Personal",
+              "Meeting",
+              "Shopping",
+              "Ideas",
+              "Travel",
+              "Finance",
+              "Health",
+              "Important",
+              "Todo"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title"
+        ],
+        "description": "Field definitions:\n\n```javascript\n{\n  title: {\n    type: String,\n    required: true,\n    minLength: 1,\n  },\n  content: {\n    type: String,\n    required: false,\n  },\n  tag: {\n    type: String,\n    required: false,\n    enum: [\"Work\",\"Personal\",\"Meeting\",\"Shopping\",\"Ideas\",\"Travel\",\"Finance\",\"Health\",\"Important\",\"Todo\"],\n    minLength: 1,\n  },\n}\n```"
+      },
+      "GetAllNotesQuery": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "minimum": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 5,
+            "maximum": 20
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "Work",
+              "Personal",
+              "Meeting",
+              "Shopping",
+              "Ideas",
+              "Travel",
+              "Finance",
+              "Health",
+              "Important",
+              "Todo"
+            ]
+          },
+          "search": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Field definitions:\n\n```javascript\n{\n  page: {\n    type: Number,\n    required: false,\n    default: 1,\n    minimum: 1,\n  },\n  perPage: {\n    type: Number,\n    required: false,\n    default: 10,\n    minimum: 5,\n    maximum: 20,\n  },\n  tag: {\n    type: String,\n    required: false,\n    enum: [\"Work\",\"Personal\",\"Meeting\",\"Shopping\",\"Ideas\",\"Travel\",\"Finance\",\"Health\",\"Important\",\"Todo\"],\n    minLength: 1,\n  },\n  search: {\n    type: String,\n    required: false,\n  },\n}\n```"
+      },
+      "NoteIdParams": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "description": "MongoDB ObjectId validated by mongoose.isValidObjectId. The Joi field itself is optional; OpenAPI path parameters are always required."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Field definitions:\n\n```javascript\n{\n  noteId: {\n    type: String,\n    required: false,\n    minLength: 1,\n    pattern: \"^[a-fA-F0-9]{24}$\",\n  },\n}\n```"
+      },
+      "UpdateNoteBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "Work",
+              "Personal",
+              "Meeting",
+              "Shopping",
+              "Ideas",
+              "Travel",
+              "Finance",
+              "Health",
+              "Important",
+              "Todo"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "minProperties": 1,
+        "description": "Field definitions:\n\n```javascript\n{\n  title: {\n    type: String,\n    required: false,\n    minLength: 1,\n  },\n  content: {\n    type: String,\n    required: false,\n  },\n  tag: {\n    type: String,\n    required: false,\n    enum: [\"Work\",\"Personal\",\"Meeting\",\"Shopping\",\"Ideas\",\"Travel\",\"Finance\",\"Health\",\"Important\",\"Todo\"],\n    minLength: 1,\n  },\n}\n```"
+      },
+      "UpdateNoteParams": {
+        "type": "object",
+        "properties": {
+          "noteId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "description": "MongoDB ObjectId validated by mongoose.isValidObjectId. The Joi field itself is optional; OpenAPI path parameters are always required."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Field definitions:\n\n```javascript\n{\n  noteId: {\n    type: String,\n    required: false,\n    minLength: 1,\n    pattern: \"^[a-fA-F0-9]{24}$\",\n  },\n}\n```"
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "_id",
+          "email",
+          "username",
+          "avatar",
+          "createdAt",
+          "updatedAt",
+          "__v"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "email": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string",
+            "description": "Defaults to the email on save."
+          },
+          "avatar": {
+            "type": "string",
+            "default": "https://ac.goit.global/fullstack/react/default-avatar.jpg"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer"
+          }
+        },
+        "description": "Serialized User document. The toJSON method removes password.\n\nField definitions:\n\n```javascript\n{\n  _id: {\n    type: String,\n    required: true,\n    pattern: \"^[a-fA-F0-9]{24}$\",\n  },\n  email: {\n    type: String,\n    required: true,\n    trim: true,\n  },\n  username: {\n    type: String,\n    required: true,\n    trim: true,\n  },\n  avatar: {\n    type: String,\n    required: true,\n    default: \"https://ac.goit.global/fullstack/react/default-avatar.jpg\",\n  },\n  createdAt: {\n    type: String,\n    required: true,\n    format: \"date-time\",\n  },\n  updatedAt: {\n    type: String,\n    required: true,\n    format: \"date-time\",\n  },\n  __v: {\n    type: Number,\n    required: true,\n  },\n}\n```"
+      },
+      "Note": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "_id",
+          "title",
+          "content",
+          "tag",
+          "userId",
+          "createdAt",
+          "updatedAt",
+          "__v"
+        ],
+        "properties": {
+          "_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "title": {
+            "type": "string",
+            "description": "Trimmed by Mongoose."
+          },
+          "content": {
+            "type": "string",
+            "default": "",
+            "description": "Trimmed by Mongoose."
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "Work",
+              "Personal",
+              "Meeting",
+              "Shopping",
+              "Ideas",
+              "Travel",
+              "Finance",
+              "Health",
+              "Important",
+              "Todo"
+            ],
+            "default": "Todo"
+          },
+          "userId": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "__v": {
+            "type": "integer"
+          }
+        },
+        "description": "Field definitions:\n\n```javascript\n{\n  _id: {\n    type: String,\n    required: true,\n    pattern: \"^[a-fA-F0-9]{24}$\",\n  },\n  title: {\n    type: String,\n    required: true,\n    trim: true,\n  },\n  content: {\n    type: String,\n    required: true,\n    trim: true,\n    default: \"\",\n  },\n  tag: {\n    type: String,\n    required: true,\n    default: \"Todo\",\n    enum: [\"Work\",\"Personal\",\"Meeting\",\"Shopping\",\"Ideas\",\"Travel\",\"Finance\",\"Health\",\"Important\",\"Todo\"],\n  },\n  userId: {\n    type: String,\n    required: true,\n    pattern: \"^[a-fA-F0-9]{24}$\",\n  },\n  createdAt: {\n    type: String,\n    required: true,\n    format: \"date-time\",\n  },\n  updatedAt: {\n    type: String,\n    required: true,\n    format: \"date-time\",\n  },\n  __v: {\n    type: Number,\n    required: true,\n  },\n}\n```"
+      },
+      "NotePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "page",
+          "perPage",
+          "totalNotes",
+          "totalPages",
+          "notes"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "default": 1,
+            "minimum": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "default": 10,
+            "minimum": 5,
+            "maximum": 20
+          },
+          "totalNotes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          }
+        },
+        "description": "Field definitions:\n\n```javascript\n{\n  page: {\n    type: Number,\n    required: true,\n    default: 1,\n    minimum: 1,\n  },\n  perPage: {\n    type: Number,\n    required: true,\n    default: 10,\n    minimum: 5,\n    maximum: 20,\n  },\n  totalNotes: {\n    type: Number,\n    required: true,\n    minimum: 0,\n  },\n  totalPages: {\n    type: Number,\n    required: true,\n    minimum: 0,\n  },\n  notes: {\n    type: Array,\n    required: true,\n  },\n}\n```"
+      },
+      "Message": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "Field definitions:\n\n```javascript\n{\n  message: {\n    type: String,\n    required: true,\n  },\n}\n```"
+      },
+      "ValidationError": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "validation"
+        ],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "enum": [
+              400
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "validation": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "keys",
+                "message"
+              ],
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "body",
+                    "query",
+                    "params",
+                    "headers",
+                    "cookies",
+                    "signedCookies"
+                  ]
+                },
+                "keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "description": "Field definitions:\n\n```javascript\n{\n  statusCode: {\n    type: Number,\n    required: true,\n    enum: [400],\n  },\n  error: {\n    type: String,\n    required: true,\n    enum: [\"Bad Request\"],\n  },\n  message: {\n    type: String,\n    required: true,\n  },\n  validation: {\n    type: Object,\n    required: true,\n  },\n}\n```"
+      },
+      "AvatarUpload": {
+        "type": "object",
+        "required": [
+          "avatar"
+        ],
+        "properties": {
+          "avatar": {
+            "type": "string",
+            "format": "binary",
+            "description": "One file with an image/* MIME type, up to 2097152 bytes (2 MiB).",
+            "x-maxBytes": 2097152,
+            "x-allowedMimeTypes": [
+              "image/*"
+            ]
+          }
+        },
+        "description": "Multer accepts other text fields and ignores them. No Celebrate validation is applied.\n\nField definitions:\n\n```javascript\n{\n  avatar: {\n    type: String,\n    required: true,\n    format: \"binary\",\n  },\n}\n```"
+      },
+      "AvatarResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Cloudinary secure_url saved as the user avatar."
+          }
+        },
+        "description": "Field definitions:\n\n```javascript\n{\n  url: {\n    type: String,\n    required: true,\n  },\n}\n```"
+      }
+    }
+  }
+}

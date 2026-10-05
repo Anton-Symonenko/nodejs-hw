@@ -3,6 +3,8 @@ import 'dotenv/config';
 import cors from 'cors';
 import { errors } from 'celebrate';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
+import { readFileSync } from 'node:fs';
 
 import { connectMongoDB } from './db/connectMongoDB.js';
 import { logger } from './middleware/logger.js';
@@ -20,6 +22,19 @@ app.use(cookieParser());
 app.use(logger);
 
 const PORT = process.env.PORT || 3000;
+
+const swaggerDocument = JSON.parse(
+  readFileSync(new URL('../swagger.json', import.meta.url), 'utf8'),
+);
+swaggerDocument.servers[0].url = `http://localhost:${PORT}`;
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument, {
+    customCss: readFileSync(new URL('./docs/swagger.css', import.meta.url), 'utf8'),
+    swaggerOptions: { withCredentials: true },
+  }),
+);
 
 app.use(router);
 app.use(notesRoutes);
